@@ -50,7 +50,7 @@ def on_release(key, inst, mix):
 
 
 def main():
-
+    #NEW ARCHITECTURE
     m = Mix()
     piano = Piano()
     print(1)
