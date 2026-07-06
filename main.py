@@ -3,6 +3,7 @@ from Models.Mix import Mix
 from pynput import keyboard
 import numpy as np
 import pyaudio #portaudio.h installation error , fix:(brew install portaudio) (macOS)
+import time
 
 
 def generate_sine_wave(ini ,end ,mix, CHUNKS_SAMPLE, mixed_chunk):
@@ -14,13 +15,24 @@ def generate_sine_wave(ini ,end ,mix, CHUNKS_SAMPLE, mixed_chunk):
 
     #Calculate the sin wave math: sin(2 * pi * f * t)
 
+
     for frequency in mix.listMix:
-        wave = np.sin(2 * np.pi * frequency * t)
-        mixed_chunk += wave
+
+        freq_ajust = np.sqrt(frequency/ 261.63)
+
+        f1 = (0.5 * freq_ajust) * np.sin(2 * np.pi * frequency * t)
+        f2 = (0.3 * freq_ajust) * np.sin(2 * np.pi * (frequency * 2) * t)
+        f3 = (0.2 * freq_ajust) * np.sin(2 * np.pi * (frequency * 3) * t)
+
+        harmonics_wave = f1 + f2 + f3
+        mixed_chunk += harmonics_wave
 
 
+    if len(mix.listMix) > 0:
+        mixed_chunk = mixed_chunk / (len(mix.listMix))
 
-    mixed_chunk = mixed_chunk / len(mix.listMix)
+    mixed_chunk = np.tanh(mixed_chunk)
+
     # Convert the wave to 16 - bit audio format that sound cards expect
     # This scales our wave from (-1.0 to 1.0) to (-32768 to 32767)
 
@@ -32,8 +44,14 @@ def generate_sine_wave(ini ,end ,mix, CHUNKS_SAMPLE, mixed_chunk):
 def on_press(key, inst, mix):
     try:
         if key.char in inst.NOTE_MAPPING:
-            if inst.NOTE_MAPPING[key.char] not in mix.listMix:
-                mix.AddNote(inst.NOTE_MAPPING[key.char])
+            if not any(n["freq"] == inst.NOTE_MAPPING[key.char] for n in mix.listMix):
+                new_note = {
+                    "freq": inst.NOTE_MAPPING[key.char],
+                    "start_t": time.time(),
+                    "release_t": None
+                }
+
+
     except AttributeError:
         print('special key {0} pressed'.format(
             key))
@@ -89,14 +107,6 @@ def main():
         stream.stop_stream()
         stream.close()
         p.terminate()
-
-
-
-
-
-
-
-
 
 
 if __name__ == '__main__':

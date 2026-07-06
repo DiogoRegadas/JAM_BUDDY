@@ -9,7 +9,7 @@ class Mix:
 
     def AddNote(self, note):
         self.__listMix.append(note)
-        print("MIX LISTA UPDATE")
+
 
     def removeNote(self, note):
         self.__listMix.remove(note)
