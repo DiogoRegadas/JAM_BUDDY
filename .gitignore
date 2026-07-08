@@ -1,0 +1,10 @@
+# Ignore PyCharm configuration files
+.idea/
+
+# Ignore Python bytecode compilation caches
+__pycache__/
+*.pyc
+
+# Ignore local audio/log outputs if any
+*.wav
+*.log
