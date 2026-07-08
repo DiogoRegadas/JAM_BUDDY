@@ -7,7 +7,7 @@ class Mix:
     def listMix(self):
         return self.__listMix
 
-    def AddNote(self, note):
+    def addNote(self, note):
         self.__listMix.append(note)
 
 

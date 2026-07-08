@@ -1,108 +1,54 @@
-from Models.Piano import Piano
-from Models.Mix import Mix
-from pynput import keyboard
+# main.py
+import pyaudio
 import numpy as np
-import pyaudio #portaudio.h installation error , fix:(brew install portaudio) (macOS)
 import time
 
-
-def generate_sine_wave(ini ,end ,mix, CHUNKS_SAMPLE, mixed_chunk):
-
-    # Create an array of time points from 0 to 'duration'
-    # For 1 second at 44100Hz, this creates 44,100 evenly spaced numbers
-    t = np.linspace(ini, end, CHUNKS_SAMPLE, endpoint=False, dtype=np.float32)
-
-
-    #Calculate the sin wave math: sin(2 * pi * f * t)
-
-
-    for frequency in mix.listMix:
-
-        freq_ajust = np.sqrt(frequency/ 261.63)
-
-        f1 = (0.5 * freq_ajust) * np.sin(2 * np.pi * frequency * t)
-        f2 = (0.3 * freq_ajust) * np.sin(2 * np.pi * (frequency * 2) * t)
-        f3 = (0.2 * freq_ajust) * np.sin(2 * np.pi * (frequency * 3) * t)
-
-        harmonics_wave = f1 + f2 + f3
-        mixed_chunk += harmonics_wave
-
-
-    if len(mix.listMix) > 0:
-        mixed_chunk = mixed_chunk / (len(mix.listMix))
-
-    mixed_chunk = np.tanh(mixed_chunk)
-
-    # Convert the wave to 16 - bit audio format that sound cards expect
-    # This scales our wave from (-1.0 to 1.0) to (-32768 to 32767)
-
-    audio_data = (mixed_chunk * 32767).astype(np.int16)
-
-    return audio_data.tobytes()
-
-
-def on_press(key, inst, mix):
-    try:
-        if key.char in inst.NOTE_MAPPING:
-            if not any(n["freq"] == inst.NOTE_MAPPING[key.char] for n in mix.listMix):
-                new_note = {
-                    "freq": inst.NOTE_MAPPING[key.char],
-                    "start_t": time.time(),
-                    "release_t": None
-                }
-
-
-    except AttributeError:
-        print('special key {0} pressed'.format(
-            key))
-
-
-def on_release(key, inst, mix):
-
-    if key.char in inst.NOTE_MAPPING:
-        if inst.NOTE_MAPPING[key.char] in mix.listMix:
-            mix.removeNote(inst.NOTE_MAPPING[key.char])
-    elif key == keyboard.Key.esc:
-        # Stop listener
-        return False
+# Internal imports from our new modular layout
+from Models.Instr.Piano import Piano
+from Models.Lists.Mix import Mix
+from audio_engine import generate_sine_wave, remove_notes
+from input_handler import start_keyboard_listener
 
 
 def main():
-    #NEW ARCHITECTURE
     m = Mix()
     piano = Piano()
-    print(1)
-    listener = keyboard.Listener(
-            on_press=lambda event: on_press(event, piano, m),
-            on_release=lambda event: on_release(event, piano, m))
-    listener.start()
 
-    print(2)
+    # Fire up the listener from our input module
+    listener = start_keyboard_listener(piano, m)
+    print("Keyboard listener started.")
+
     p = pyaudio.PyAudio()
-    stream = p.open(format=pyaudio.paInt16, channels=1, rate=44100,output=True)
     SAMPLE_RATE = 44100
     CHUNK_DURATION = 0.02
     CHUNK_SAMPLE = int(SAMPLE_RATE * CHUNK_DURATION)
+    RELEASED_DURATION = 0.05
 
+    stream = p.open(format=pyaudio.paInt16, channels=1, rate=SAMPLE_RATE, output=True)
     current_sample_index = 0
 
+    print("Synthesizer running... Press SPACE to let your AI_JAM_BUDDY take over --or-- Ctrl+C to stop.")
     try:
         while True:
-
             mixed_chunk = np.zeros(CHUNK_SAMPLE, dtype=np.float32)
-            if len(m.listMix) > 0:
 
+            if len(m.listMix) > 0:
                 ini_time = current_sample_index / SAMPLE_RATE
                 end_time = (current_sample_index + CHUNK_SAMPLE) / SAMPLE_RATE
 
-                audio_bytes = generate_sine_wave(ini_time, end_time, m, CHUNK_SAMPLE, mixed_chunk)
-
+                audio_bytes = generate_sine_wave(
+                    ini_time, end_time, m, CHUNK_SAMPLE, mixed_chunk, RELEASED_DURATION
+                )
+                remove_notes(m, RELEASED_DURATION)
                 stream.write(audio_bytes)
-
                 current_sample_index += CHUNK_SAMPLE
-
+            else:
+                # If no notes are playing, sleep briefly to prevent 100% CPU usage
+                time.sleep(0.005)
 
     except KeyboardInterrupt:
+        print("\nShutting down cleanly...")
+    finally:
         listener.stop()
         stream.stop_stream()
         stream.close()
