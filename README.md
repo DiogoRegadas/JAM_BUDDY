@@ -1,44 +1,30 @@
 # JAM_Buddy 🎹🤖
 
-JAM_Buddy is a real-time, AI-powered musical collaborator. It listens to the live notes you play on your keyboard, processes your musical direction using a custom-trained Deep Learning model, and jams along with you in real-time when you hit the spacebar.
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-By leveraging multi-threaded concurrency, JAM_Buddy seamlessly interleaves predictive AI generation with a high-performance audio synthesis pipeline—completely eliminating latency and audio buffering artifacts.
+An asynchronous, real-time AI musical accompaniment engine. JAM_Buddy listens to live user input, updates a rolling context window, and utilizes a custom-trained Deep Learning model to synthesize complementary improvisations dynamically upon triggering.
 
----
-
-## 🚀 Key Features
-
-* **Custom Neural Network Architecture:** Built from scratch using PyTorch, utilizing custom Token Embeddings and stacked Long Short-Term Memory (LSTM) layers to capture complex musical context, harmony, and melodic momentum.
-* **Intelligent Improvisation:** Features mathematical temperature controls to let you adjust the AI's creativity, allowing it to transition between rigid pattern adherence and highly expressive soloing.
-* **Lag-Free Concurrency:** Implements a decoupled multi-threaded architecture where the AI "Composer" thread schedules notes ahead of time into a synchronized timeline queue, keeping the high-speed Audio Engine thread entirely unblocked.
-* **Flexible Audio Synthesizer:** Fully native digital signal processing loop generating clean mathematical wave chunks at a precise granular `CHUNK_DURATION` of 20ms.
+By decoupling the deep learning inference from the core audio pipeline via a multi-threaded architecture, the system guarantees low-latency, glitch-free audio processing at a granular 20ms chunk scale.
 
 ---
 
-## 🧠 The AI Brain Architecture
+## 🚀 System Architecture & Pipeline
 
-The underlying core model (`MusicAI`) is designed specifically for temporal sequence tracking:
+JAM_Buddy is split into two distinct, isolated operational loops running on separate CPU execution threads to preserve audio buffer integrity:
 
-1.  **Embedding Layer:** Maps raw MIDI integers into a dense 64-dimensional harmonic vector space.
-2.  **Stacked LSTM Layers:** A 128-hidden-unit recurring notepad architecture tracking sequential context window frames across an 8-note `SEQUENCE_LENGTH`.
-3.  **Linear Output Layer:** Projects deep memory vectors back across a 128-key probability distribution representing every possible note on a full piano keyboard.
-
-During training across classical repositories (e.g., Bach, Beethoven, Mozart), the optimization engine successfully reduced categorization loss error by **over 92%** (dropping from a baseline of `2.85` down to a highly accurate `0.22`).
-
----
-
-## 🛠️ Project Structure
+1.  **The Audio Synthesis Thread (High Priority):** Continuously renders digital signal processing (DSP) wave chunks every `0.02 seconds` (20ms). It evaluates a shared thread-safe timeline queue (`mix`) to mix and output valid active frequencies.
+2.  **The Predictive Inference Thread (Background):** Wakes up via a timed metronome step. It evaluates the user's recent input history tensor, performs a forward pass through the model, and appends time-forged note event dictionaries directly into the shared timeline.
 
 ```text
-JAM_Buddy/
-├── AI/
-│   ├── model.py            # PyTorch Neural Network definition (LSTM)
-│   ├── train.py            # Mathematical training & backpropagation loop
-│   ├── predictor.py        # Inference engine & probabilistic sampler
-│   ├── helpers.py          # Data utilities (e.g., MIDI-to-Frequency mapping)
-│   └── midi_files/         # Your raw MIDI data library directory
-├── Tests/
-│   └── predicted_Test.py   # Simulation verification script
-├── activate_Jam_Buddy.py   # Asynchronous multi-threading thread manager
-├── main.py                 # Core entry point and real-time audio loop
-└── piano_ai.pt             # The frozen serialized model binary weights 🧠
+  [ User MIDI Input ] ──► [ 8-Step History Buffer ]
+                                  │
+                                  ▼
+                        [ AI Inference Thread ]
+                        ┌───────────────────┐
+                        │ Forward Pass      │
+                        │ Prob Sampler      │ ──► [ Time-Forged Note Event ]
+                        └───────────────────┘                 │
+                                                              ▼
+ [ Audio Out ] ◄── [ 20ms DSP Chunk Render ] ◄── Read ── [ Shared Mix Timeline ]
