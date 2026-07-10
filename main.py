@@ -8,14 +8,16 @@ from Models.Instr.Piano import Piano
 from Models.Lists.Mix import Mix
 from audio_engine import generate_sine_wave, remove_notes
 from input_handler import start_keyboard_listener
+from AI.predictor import AIPredictor
 
 
 def main():
     m = Mix()
     piano = Piano()
+    predictor = AIPredictor(model_path="piano_ai.pt")
 
     # Fire up the listener from our input module
-    listener = start_keyboard_listener(piano, m)
+    listener = start_keyboard_listener(piano, m, predictor)
     print("Keyboard listener started.")
 
     p = pyaudio.PyAudio()

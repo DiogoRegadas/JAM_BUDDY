@@ -8,3 +8,6 @@ __pycache__/
 # Ignore local audio/log outputs if any
 *.wav
 *.log
+
+# Ignore the raw data files
+AI/midi_files/
